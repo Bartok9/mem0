@@ -1883,7 +1883,8 @@ class Memory(MemoryBase):
                 errors.append(err)
                 logger.warning("Delete error: %s", err)
 
-        if self._entity_store is not None:
+        # getattr: unit tests (and partial constructions) may skip __init__.
+        if getattr(self, "_entity_store", None) is not None:
             self._bulk_clear_entity_store(filters)
 
         if errors:
@@ -3514,7 +3515,7 @@ class AsyncMemory(MemoryBase):
 
         results = await asyncio.gather(*delete_tasks, return_exceptions=True)
 
-        if self._entity_store is not None:
+        if getattr(self, "_entity_store", None) is not None:
             await self._bulk_clear_entity_store(filters)
 
         errors = [r for r in results if isinstance(r, BaseException)]

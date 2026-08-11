@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, Mock
 import pytest
 
 from mem0.exceptions import LLMError
-from mem0.memory.main import AsyncMemory, Memory
+from mem0.memory.main import AsyncMemory, Memory, _validate_search_params
 
 
 def _setup_mocks(mocker):
@@ -1178,3 +1178,18 @@ class TestAddPipelineEntityEmbeddingCountGuard:
         assert any("padding/truncating" in r.message for r in caplog.records), (
             "expected count-mismatch warning was not emitted"
         )
+
+
+def test_validate_search_params_rejects_bool_threshold():
+    """bool is a subclass of int in Python, so it must be rejected explicitly."""
+    with pytest.raises(ValueError, match="threshold must be a valid number"):
+        _validate_search_params(threshold=True)
+    with pytest.raises(ValueError, match="threshold must be a valid number"):
+        _validate_search_params(threshold=False)
+
+
+def test_validate_search_params_accepts_numeric_threshold():
+    """Legitimate numeric thresholds should still pass."""
+    _validate_search_params(threshold=0.0)
+    _validate_search_params(threshold=0.5)
+    _validate_search_params(threshold=1.0)

@@ -194,6 +194,8 @@ class MilvusDB(VectorStoreBase):
 
             if raw_distance is not None and self.metric_type in (MetricType.L2, "L2"):
                 score = 1.0 / (1.0 + raw_distance)
+            elif raw_distance is not None and self.metric_type == MetricType.COSINE:
+                score = max(0.0, 1.0 - raw_distance)
             else:
                 score = raw_distance
 

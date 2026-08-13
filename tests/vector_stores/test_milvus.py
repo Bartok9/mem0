@@ -136,10 +136,10 @@ class TestMilvusDB:
         call_args = mock_milvus_client.search.call_args
         assert call_args[1]['filter'] == '(metadata["user_id"] == "alice")'
         
-        # Verify results are parsed correctly
+        # Verify results are parsed correctly — COSINE converts distance to similarity
         assert len(results) == 1
         assert results[0].id == "mem1"
-        assert results[0].score == 0.8
+        assert results[0].score == max(0.0, 1.0 - 0.8)
 
     def test_search_different_user_ids(self, milvus_db, mock_milvus_client):
         """Test that search works with different user_ids (reproduces reported bug)."""
@@ -226,7 +226,7 @@ class TestMilvusDB:
         assert len(results[0]) == 2
 
     def test_parse_output(self, milvus_db):
-        """Test output data parsing."""
+        """Test output data parsing — COSINE converts distance to similarity."""
         raw_data = [
             {
                 "id": "mem1",
@@ -239,15 +239,34 @@ class TestMilvusDB:
                 "entity": {"metadata": {"user_id": "bob"}}
             }
         ]
-        
+
         parsed = milvus_db._parse_output(raw_data)
-        
+
         assert len(parsed) == 2
         assert parsed[0].id == "mem1"
-        assert parsed[0].score == 0.9
+        assert parsed[0].score == max(0.0, 1.0 - 0.9)
         assert parsed[0].payload == {"user_id": "alice"}
         assert parsed[1].id == "mem2"
-        assert parsed[1].score == 0.85
+        assert parsed[1].score == max(0.0, 1.0 - 0.85)
+        assert parsed[1].payload == {"user_id": "bob"}
+
+    def test_parse_output_l2_converts_distance(self, mock_milvus_client):
+        """L2 metric must convert raw distance to similarity via 1/(1+d)."""
+        db = MilvusDB(
+            url="http://localhost:19530",
+            token="test_token",
+            collection_name="test_collection",
+            embedding_model_dims=1536,
+            metric_type=MetricType.L2,
+            db_name="test_db",
+        )
+        raw_data = [
+            {"id": "mem1", "distance": 2.0, "entity": {"metadata": {}}},
+            {"id": "mem2", "distance": 0.0, "entity": {"metadata": {}}},
+        ]
+        parsed = db._parse_output(raw_data)
+        assert parsed[0].score == 1.0 / (1.0 + 2.0)
+        assert parsed[1].score == 1.0 / (1.0 + 0.0)
 
     def test_update_with_none_vector_fetches_existing(self, milvus_db, mock_milvus_client):
         """Test that update with vector=None fetches the existing vector (fixes #3708)."""

@@ -310,6 +310,31 @@ def test_delete_all_paginates_beyond_vector_store_page_size(memory_instance):
     assert memory_instance.vector_store.list.call_count == 3
 
 
+def test_delete_all_handles_empty_flat_list(memory_instance):
+    """Some vector stores (e.g. langchain) return a flat list instead of a tuple."""
+    memory_instance.vector_store.list = Mock(return_value=[])
+    memory_instance._delete_memory = Mock()
+
+    result = memory_instance.delete_all(user_id="test_user")
+
+    memory_instance._delete_memory.assert_not_called()
+    assert result["message"] == "Memories deleted successfully!"
+
+
+def test_delete_all_handles_flat_list_of_memories(memory_instance):
+    """Flat list returns should also be iterated correctly."""
+    mock_memories = [Mock(id="1"), Mock(id="2")]
+    memory_instance.vector_store.list = Mock(
+        side_effect=[mock_memories, []]
+    )
+    memory_instance._delete_memory = Mock()
+
+    result = memory_instance.delete_all(user_id="test_user")
+
+    assert memory_instance._delete_memory.call_count == 2
+    assert result["message"] == "Memories deleted successfully!"
+
+
 def test_get_all(memory_instance):
     mock_memories = [Mock(id="1", payload={"data": "Memory 1", "user_id": "test_user"})]
     memory_instance.vector_store.list = Mock(return_value=(mock_memories, None))
